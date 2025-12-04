@@ -1,0 +1,44 @@
+name: Water Cut Check
+
+on:
+  schedule:
+    # Time 1: 4:23 PM IST (which is 10:53 UTC)
+    - cron: '53 10 * * *'
+    # Time 2: 10:35 PM IST (which is 17:05 UTC)
+    - cron: '5 17 * * *'
+  
+  # This allows you to run it manually if needed
+  workflow_dispatch: 
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install feedparser requests google-generativeai pytz
+
+      # Adding a small random delay prevents the bot from running at the 
+      # exact same millisecond every day, making it look more human.
+      - name: Random Sleep Delay
+        run: |
+          import time
+          import random
+          # Sleep between 1 and 120 seconds
+          time.sleep(random.randint(1, 120))
+        shell: python
+
+      - name: Run Water Cut Alert
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python Watercutalert.py
