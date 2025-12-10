@@ -27,14 +27,14 @@ model = None
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     
-    # TRY GEMINI 2.5 FLASH (Standard for Dec 2025)
+    # --- UPDATED MODEL LOGIC ---
+    # Using Flash-Lite for much higher daily limits (e.g., 1,500/day)
     try:
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+        print("   ✅ Connected to Gemini 2.5 Flash-Lite")
+    except Exception as e:
+        print(f"   ⚠️ Flash-Lite failed ({e}), falling back to 2.5 Flash...")
         model = genai.GenerativeModel('gemini-2.5-flash')
-        print("   ✅ Connected to Gemini 2.5 Flash")
-    except Exception:
-        # Fallback to 2.0 if 2.5 is not available in your region yet
-        print("   ⚠️ Gemini 2.5 failed, falling back to 2.0-flash...")
-        model = genai.GenerativeModel('gemini-2.0-flash')
 
 def get_ist_time():
     """Returns current time in Indian Standard Time."""
@@ -145,4 +145,3 @@ def check_water_cuts():
 
 if __name__ == "__main__":
     check_water_cuts()
-    
