@@ -2,10 +2,12 @@ name: Water Cut Check
 
 on:
   schedule:
-    # 4:23 PM IST
+    # Time 1: 4:23 PM IST (which is 10:53 UTC)
     - cron: '53 10 * * *'
-    # 10:35 PM IST
+    # Time 2: 10:35 PM IST (which is 17:05 UTC)
     - cron: '5 17 * * *'
+  
+  # This allows you to run it manually if needed
   workflow_dispatch: 
 
 jobs:
@@ -21,11 +23,12 @@ jobs:
         with:
           python-version: '3.10'
 
-      # IMPORTANT: Added '-U' to force upgrade to the latest library version
-      # capable of handling Gemini 2.5
+      # UPDATED: Now installing 'beautifulsoup4' to allow reading website text
       - name: Install dependencies
-        run: pip install -U feedparser requests google-generativeai pytz
+        run: pip install -U feedparser requests google-generativeai pytz beautifulsoup4
 
+      # Adding a small random delay prevents the bot from running at the 
+      # exact same millisecond every day, making it look more human.
       - name: Random Sleep Delay
         run: |
           import time
@@ -36,7 +39,6 @@ jobs:
 
       - name: Run Water Cut Alert
         env:
-          # Make sure these match the names in your GitHub Secrets
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           CHAT_ID: ${{ secrets.CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
