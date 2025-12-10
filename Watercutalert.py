@@ -57,17 +57,18 @@ def ask_gemini(headline, link):
 
     current_date = get_ist_time().strftime("%Y-%m-%d")
     
+    # --- UPDATED PROMPT: STRICTER LOGIC ---
     prompt = f"""
     Current Date: {current_date}
     Headline: "{headline}"
     Link: {link}
 
-    Task: Determine if this news indicates a Water Cut for **F-North Ward (Sion/Matunga)**.
+    Task: Determine if this news indicates a Water Cut specifically for **F-North Ward (Sion/Matunga)**.
     
     Rules:
-    1. YES if it mentions 'F-North', 'Sion', 'Matunga', 'Wadala', or 'CGS Colony'.
-    2. YES if it says "All Wards" or "Across Mumbai".
-    3. YES if it mentions 'F-Ward' generally.
+    1. YES if it explicitly mentions 'F-North', 'Sion', 'Matunga', 'Wadala', or 'CGS Colony'.
+    2. YES if it mentions 'F-Ward' generally.
+    3. NO if it mentions "Across Mumbai" or "City-wide" WITHOUT naming F-North explicitly (to avoid false positives).
     4. NO if it specifies ONLY 'F-South' or other specific wards excluding F-North.
     5. MARK RELEVANT even if the date is in the future.
 
@@ -134,10 +135,14 @@ def check_water_cuts():
             else:
                 print(f"      ✅ AI said NO.")
             
-            time.sleep(2) 
+            # --- CRITICAL FIX FOR RATE LIMIT ---
+            # Sleep 12 seconds to stay under the 5 requests/minute limit
+            print("      💤 Sleeping 12s to respect API quota...")
+            time.sleep(12) 
 
     if not relevant_news_found:
         print("   ✅ No detection today.")
 
 if __name__ == "__main__":
     check_water_cuts()
+    
