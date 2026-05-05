@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Update Keepalive Timestamp
         run: |
@@ -25,7 +25,7 @@ jobs:
           # Create or update a text file with the current date
           date > last_activity.txt
           
-          # Commit and push the change
+          # Commit and push the change gracefully
           git add last_activity.txt
-          git commit -m "Automated keep-alive commit"
-          giTimestampmp
+          git commit -m "Automated keep-alive commit" || echo "No changes to commit"
+          git push
