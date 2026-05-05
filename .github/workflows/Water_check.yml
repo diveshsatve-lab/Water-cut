@@ -23,9 +23,9 @@ jobs:
         with:
           python-version: '3.10'
 
-      # UPDATED: Now installing 'beautifulsoup4' to allow reading website text
+      # UPDATED: Changed google-generativeai to google-genai
       - name: Install dependencies
-        run: pip install -U feedparser requests google-generativeai pytz beautifulsoup4
+        run: pip install -U feedparser requests google-genai pytz beautifulsoup4
 
       # Adding a small random delay prevents the bot from running at the 
       # exact same millisecond every day, making it look more human.
