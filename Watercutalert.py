@@ -153,21 +153,37 @@ def get_article_text(url):
         return ""
 
 def build_prompt(headline, article_text):
-    return f"""Current Date: {get_ist_time().strftime("%Y-%m-%d")}
+    current_dt = get_ist_time()
+    return f"""Current Date & Time (IST): {current_dt.strftime("%Y-%m-%d %H:%M")}
 HEADLINE: "{headline}"
 ARTICLE TEXT: "{article_text}"
+TASK: Does this article describe a COMPLETE water supply shutdown/suspension that affects F-North Ward (Sion, Matunga, Wadala, CGS Colony) AND is it still relevant right now?
 
-TASK: Does this article describe a COMPLETE water supply shutdown/suspension that affects F-North Ward (Sion, Matunga, Wadala, CGS Colony)?
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+STEP 1 â€” LOCATION CHECK
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+Search the ENTIRE article text for any of these keywords: "F North", "F-North", "F Ward", "Sion", "Matunga", "Wadala", "CGS" (ignore hyphens, spaces, and capitalization)
+â†’ If NONE found: Reply NO immediately. Stop here.
+â†’ If found: Continue to Step 2.
 
-LOGIC:
-1. If the article lists specific wards and DOES NOT mention F-North/Sion/Matunga/Wadala/CGS -> Reply NO.
-2. If the article says "Whole Mumbai" or "All Wards" -> Reply NO unless F-North or F Ward is explicitly named.
-3. ONLY Reply YES if you see: "F-North Ward", "F Ward", "Sion", "Matunga", "Wadala", "CGS", or "F-North".
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+STEP 2 â€” TIME WINDOW CHECK (Store or Conserve)
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+The user needs to know if they should STORE water (upcoming cut) or CONSERVE water (ongoing cut).
+Find the START and END of the water cut from the article.
 
-OUTPUT FORMAT (one line only):
-YES | [Short one-line summary of who is affected and for how long]
-or
-NO"""
+Apply this strict rule:
+â†’ If the END time of the water cut is strictly AFTER the current date/time ({current_dt.strftime("%Y-%m-%d %H:%M")} IST): The cut is either upcoming OR currently happening. The user must be alerted to store or conserve water â†’ Reply YES.
+â†’ If the END time of the water cut is BEFORE or EQUAL to the current date/time: The cut is 100% over. Water is back to normal â†’ Reply NO.
+â†’ If no end time is mentioned, assume it is ongoing if the start date is today or tomorrow â†’ Reply YES.
+
+REAL EXAMPLES (memorize this logic):
+Article says: "30-hour water cut from May 5, 10 AM to May 6, 4 PM"
+â€¢ Current time: May 5, 8 AM â†’ END (May 6) is future â†’ YES (Alert to store water)
+â€¢ Current time: May 5, 2 PM â†’ END (May 6) is future â†’ YES (Cut started, but user must conserve water for tomorrow)
+â€¢ Current time: May 6, 6 PM â†’ END (May 6, 4 PM) is past â†’ NO (Cut is over, useless alert)
+
+OUTPUT FORMAT (one line only): YES | [area] | Starts: [start datetime] | [duration] or NO"""
 
 def _parse_gemini_wait(err_str):
     m = re.search(r"retryDelay[\"'\s:]+(\d+)s", err_str)
