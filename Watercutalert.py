@@ -492,30 +492,7 @@ def check_water_cuts():
 
             real_url     = decode_google_news_url(link)
             article_text = get_article_text(real_url)
-
-            # â”€â”€ Empty scrape guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            # If the website blocked our scraper, article_text is "".
-            # combined would then be just the title, which may not contain
-            # the ward name (it could only be in the article body).
-            # Discarding silently risks missing a real water cut.
-            # Instead: send a manual review alert immediately.
-            if not article_text.strip():
-                print("   âš ï¸ [F2] Scrape returned empty â€” anti-bot block suspected.")
-                print("      ðŸš¨ Sending bypass review alert (scrape failure)...")
-                msg = (
-                    f"ðŸš° <b>Water Cut Alert â€” REVIEW NEEDED</b>\n"
-                    f"ðŸ“ <b>Area: F-North / Sion / Matunga / Wadala / CGS</b>\n"
-                    f"âš ï¸ <b>Scrape Failed</b> â€” the news website blocked our bot.\n"
-                    f"ðŸ“ Passed Filter 1 (headline match). Could not verify area from body.\n\n"
-                    f"ðŸ“° {_escape_html(title)}\n"
-                    f"ðŸ”— <a href=\"{_escape_html(real_url)}\">Read Article</a>"
-                )
-                send_telegram_message(msg)
-                alerts_sent += 1
-                print()
-                continue
-
-            combined = f"{title} {article_text}"
+            combined     = f"{title} {article_text}"
 
             # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
             # FILTER 2 â€” BODY: area keyword + full-cut phrase
