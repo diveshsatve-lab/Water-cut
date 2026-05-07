@@ -26,28 +26,47 @@ RSS_URLS = [
 ]
 
 # â”€â”€ Retry budgets â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-# Max RPM/TPM rate-limit waits before switching to next AI.
-# Hard daily limits always switch immediately (no budget used).
-GEMINI_RPM_RETRY_BUDGET = 3   # 3 Ã— ~65s â‰ˆ 3.5 min max per article
-GROQ_TPM_RETRY_BUDGET   = 3   # 3 Ã— ~63s â‰ˆ 3.5 min max per article
-MAX_OTHER_ERRORS        = 3   # consecutive non-rate errors before switching
+GEMINI_RPM_RETRY_BUDGET = 3
+GROQ_TPM_RETRY_BUDGET   = 3
+MAX_OTHER_ERRORS        = 3
 
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # FILTER PATTERNS
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 HEADLINE_FULL_CUT = [
-    r"\b\d+\s*[-â€“]?\s*hour\s+water\s+(?:cut|shut\s*down|shutdown|suspension|supply\s+cut)\b",
-    r"\b\d+\s*[-â€“]?\s*hour\s+(?:water\s+)?supply\s+(?:cut|shutdown|suspension|disruption)\b",
-    r"\bwater\s+supply\s+(?:will\s+(?:be\s+|remain\s+)?)?(?:suspended|stopped|halted|shut\s*down|disrupted|cut\s+off)\b",
-    r"\bsupply\s+(?:will\s+(?:be\s+)?)?(?:suspended|stopped|halted|shut\s*down|cut\s+off)\b",
+    # X-hour water cut / shutdown / suspension / disruption / snapped
+    r"\b\d+\s*[-â€“â€”]?\s*hour\s+water\s+(?:cut|shut\s*down|shutdown|suspension|supply\s+cut)\b",
+    r"\b\d+\s*[-â€“â€”]?\s*hour\s+(?:water\s+)?supply\s+(?:cut|shutdown|suspension|disrupt(?:ion|ed|s)?|snapped)\b",
+
+    # supply suspended / stopped / halted / shut down / disrupted / hit / affected / snapped / unavailable
+    r"\bwater\s+supply\s+(?:(?:will|is|to)\s+(?:be\s+|remain\s+)?)?(?:suspended|stopped|halted|shut\s*down|disrupt(?:ed|s)?|cut\s+off|hit|affected|snapped|unavailable)\b",
+    r"\bsupply\s+(?:(?:will|is|to)\s+(?:be\s+|remain\s+)?)?(?:suspended|stopped|halted|shut\s*down|cut\s+off|hit|affected|snapped|unavailable)\b",
+
+    # water cut (not followed by %)
     r"\bwater\s+cut\b(?!\s*\d*\s*%)",
-    r"\bno\s+water\s+supply\b",
-    r"\bwater\s+shut(?:\s*down|-?off)\b",
+
+    # no water / zero water
+    r"\b(?:no|zero)\s+water\s+supply\b",
+    r"\bno\s+water\s+(?:for|in|on|tomorrow|today)\b",
+
+    # water shutdown / shutoff / snapped
+    r"\bwater\s+(?:shut(?:\s*down|-?off)|snapped)\b",
+
+    # complete / full / total water cut / stoppage
     r"\b(?:complete|full|total)\s+water\s+(?:cut|shutdown|suspension|stoppage)\b",
+
+    # dry taps / go dry
     r"\bdry\s+taps?\b",
-    r"\bbmc\s+(?:shuts?|stops?|suspends?|halts?)\s+water\b",
-    r"\bwater\s+(?:supply\s+)?disruption\b",
-    r"\bface\s+(?:water\s+cut|no\s+water|water\s+shutdown)\b",
+    r"\b(?:go|goes|going)\s+dry\b",
+
+    # BMC shuts / stops / suspends / halts / snaps water
+    r"\bbmc\s+(?:shuts?|stops?|suspends?|halts?|snaps?)\s+water\b",
+
+    # general water disruption / hit / affected / snapped
+    r"\bwater\s+(?:supply\s+)?(?:disrupt(?:ion|s|ed)|hit|affected|snapped)\b",
+
+    # residents to face water cut / dry taps
+    r"\bface\s+(?:water\s+cut|no\s+water|water\s+shutdown|dry\s+taps)\b",
 ]
 
 HEADLINE_PARTIAL_REJECT = [
@@ -65,17 +84,31 @@ HEADLINE_PARTIAL_REJECT = [
 ]
 
 AREA_PATTERNS = [
-    r"\bf[\s\-]?north\b",
-    r"\bf[\s\-]?ward\b",
+    # F-North (Catches: F North, F-North, F/North, FNorth)
+    r"\bf[\s\-/]?north\b",
+
+    # F Ward (Catches: F Ward, F-Ward, F/Ward)
+    r"\bf[\s\-/]?ward\b",
+
+    # BMC abbreviation (Catches: F/N, F-N, F N, F/N Ward)
+    r"\bf[\s\-/]n\b",
+
+    # Sion & sub-areas (Catches: Sion, Sion East, Sion(E), Sion Koliwada)
     r"\bsion\b",
+
+    # Matunga & sub-areas (Catches: Matunga, Matunga East, Matunga Labour Camp)
     r"\bmatunga\b",
+
+    # Wadala & sub-areas (Catches: Wadala, Wadala TT, Wadala East)
     r"\bwadala\b",
-    r"\bcgs\b",
+
+    # CGS Colony (Catches: CGS, C.G.S, C.G.S., C G S, CGS Colony)
+    r"\bc\.?\s*g\.?\s*s\.?\b",
 ]
 
 BODY_FULL_CUT = [
-    r"\b\d+\s*[-â€“]?\s*hour\s+water\s+(?:cut|shut\s*down|shutdown|suspension|supply\s+cut)\b",
-    r"\b\d+\s*[-â€“]?\s*hour\s+(?:water\s+)?supply\s+(?:cut|shutdown|suspension|disruption)\b",
+    r"\b\d+\s*[-â€“â€”]?\s*hour\s+water\s+(?:cut|shut\s*down|shutdown|suspension|supply\s+cut)\b",
+    r"\b\d+\s*[-â€“â€”]?\s*hour\s+(?:water\s+)?supply\s+(?:cut|shutdown|suspension|disruption)\b",
     r"\bwater\s+supply\s+(?:will\s+(?:be\s+|remain\s+)?)?(?:suspended|stopped|halted|shut\s*down|disrupted|cut\s+off)\b",
     r"\bsupply\s+(?:will\s+(?:be\s+)?)?(?:suspended|stopped|halted|shut\s*down|cut\s+off)\b",
     r"\bwater\s+cut\b(?!\s*\d*\s*%)",
@@ -202,8 +235,6 @@ def _is_gemini_hard_daily(err_str):
     has_per_day = "requestsperday" in err_lower or "perday" in err_lower
     has_per_min = "perminute" in err_lower
     hard_zero   = bool(re.search(r'"limit"\s*:\s*0\b', err_lower))
-    # Generic quota-exceeded message Google sometimes returns instead of
-    # the structured PerDay error (confirmed in logs from 2026-05-05/06)
     generic_quota = "exceeded your current quota" in err_lower
     return (has_per_day and not has_per_min and hard_zero) or generic_quota
 
@@ -252,32 +283,28 @@ def ask_gemini(headline, article_text):
                 raise ValueError("Empty response from Gemini")
             other_errors = 0
             print(f"      ðŸ’¬ Gemini: {result[:100]}")
-            return result   # "YES|..." or "NO"
+            return result
 
         except Exception as e:
             err = str(e)
             print(f"      âš ï¸ Gemini error (attempt {attempt}): {err[:250]}")
 
-            # â”€â”€ 1. Hard daily RPD exhausted â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            # Catches both structured PerDay error AND generic quota msg.
             if _is_gemini_hard_daily(err):
                 print("      âŒ Gemini RPD (daily) exhausted â†’ permanently switching to Groq.")
-                return "DAILY_EXHAUSTED"   # â† sticky flag will be set in main loop
+                return "DAILY_EXHAUSTED"
 
-            # â”€â”€ 2. Per-minute RPM rate limit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if "429" in err or "RESOURCE_EXHAUSTED" in err:
                 if rpm_budget_left <= 0:
                     print(f"      âŒ Gemini RPM retry budget exhausted "
                           f"({GEMINI_RPM_RETRY_BUDGET} waits done) â†’ Groq for THIS article.")
-                    return "USE_GROQ"   # â† temporary; sticky flag NOT set
+                    return "USE_GROQ"
                 wait = _parse_gemini_wait(err)
                 rpm_budget_left -= 1
                 print(f"      â³ Gemini RPM limit. Waiting {wait}s "
                       f"[budget left after this: {rpm_budget_left}]...")
                 time.sleep(wait)
-                continue   # retry same article
+                continue
 
-            # â”€â”€ 3. Transient / unknown error â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             other_errors += 1
             if other_errors >= MAX_OTHER_ERRORS:
                 print(f"      âŒ Gemini {MAX_OTHER_ERRORS} consecutive "
@@ -325,7 +352,6 @@ def ask_groq(headline, article_text):
             r = requests.post(GROQ_URL, headers=headers,
                               json=payload, timeout=30)
 
-            # â”€â”€ 429 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             if r.status_code == 429:
                 body     = {}
                 err_text = ""
@@ -355,7 +381,7 @@ def ask_groq(headline, article_text):
             other_errors = 0
             result = r.json()["choices"][0]["message"]["content"].strip()
             print(f"      ðŸ’¬ Groq: {result[:100]}")
-            return result   # "YES|..." or "NO"
+            return result
 
         except requests.exceptions.HTTPError as e:
             print(f"      âš ï¸ Groq HTTP error (attempt {attempt}): {e}")
@@ -375,14 +401,26 @@ def ask_groq(headline, article_text):
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 # TELEGRAM
 # â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+def _escape_html(text):
+    """Escape special HTML characters so Telegram never rejects the message."""
+    return (str(text)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;"))
+
 def send_telegram_message(message):
+    """
+    Sends via HTML parse_mode â€” far more robust than Markdown.
+    Markdown breaks on any unescaped _ * [ ] in news headlines.
+    HTML only breaks on unescaped & < > which we escape above.
+    """
     if not TELEGRAM_TOKEN or not CHAT_ID:
         print("      âš ï¸ Telegram credentials missing.")
         return
     try:
         r = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-            json={"chat_id": CHAT_ID, "text": message, "parse_mode": "Markdown"},
+            json={"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"},
             timeout=10)
         if r.status_code != 200:
             print(f"      âš ï¸ Telegram error {r.status_code}: {r.text[:100]}")
@@ -410,8 +448,8 @@ def check_water_cuts():
     gemini_calls     = 0
     groq_calls       = 0
     alerts_sent      = 0
-    gemini_exhausted = False   # True = Gemini RPD gone â†’ skip for entire run
-    groq_exhausted   = False   # True = Groq  RPD gone â†’ bypass for entire run
+    gemini_exhausted = False
+    groq_exhausted   = False
 
     for rss_url in RSS_URLS:
         feed = feedparser.parse(rss_url)
@@ -454,7 +492,30 @@ def check_water_cuts():
 
             real_url     = decode_google_news_url(link)
             article_text = get_article_text(real_url)
-            combined     = f"{title} {article_text}"
+
+            # â”€â”€ Empty scrape guard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            # If the website blocked our scraper, article_text is "".
+            # combined would then be just the title, which may not contain
+            # the ward name (it could only be in the article body).
+            # Discarding silently risks missing a real water cut.
+            # Instead: send a manual review alert immediately.
+            if not article_text.strip():
+                print("   âš ï¸ [F2] Scrape returned empty â€” anti-bot block suspected.")
+                print("      ðŸš¨ Sending bypass review alert (scrape failure)...")
+                msg = (
+                    f"ðŸš° <b>Water Cut Alert â€” REVIEW NEEDED</b>\n"
+                    f"ðŸ“ <b>Area: F-North / Sion / Matunga / Wadala / CGS</b>\n"
+                    f"âš ï¸ <b>Scrape Failed</b> â€” the news website blocked our bot.\n"
+                    f"ðŸ“ Passed Filter 1 (headline match). Could not verify area from body.\n\n"
+                    f"ðŸ“° {_escape_html(title)}\n"
+                    f"ðŸ”— <a href=\"{_escape_html(real_url)}\">Read Article</a>"
+                )
+                send_telegram_message(msg)
+                alerts_sent += 1
+                print()
+                continue
+
+            combined = f"{title} {article_text}"
 
             # â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
             # FILTER 2 â€” BODY: area keyword + full-cut phrase
@@ -487,18 +548,12 @@ def check_water_cuts():
                 raw = ask_gemini(title, article_text)
 
                 if raw == "DAILY_EXHAUSTED":
-                    # Hard RPD gone â†’ skip Gemini for ALL remaining articles
                     gemini_exhausted = True
-                    # decision stays None â†’ falls through to Groq below
 
                 elif raw == "USE_GROQ":
-                    # Temporary RPM budget drain for this article only.
-                    # Gemini NOT marked exhausted â€” may recover next article.
-                    # decision stays None â†’ falls through to Groq below
                     pass
 
                 else:
-                    # Got a real answer ("YES|..." or "NO")
                     decision = raw
                     ai_used  = "Gemini 2.0 Flash"
             else:
@@ -511,7 +566,6 @@ def check_water_cuts():
 
                 if raw == "BOTH_EXHAUSTED":
                     groq_exhausted = True
-                    # decision stays None â†’ triggers bypass below
                 else:
                     decision = raw
                     ai_used  = "Groq LLaMA 3.3 70B"
@@ -519,13 +573,13 @@ def check_water_cuts():
             # â”€â”€ Step 3: Both dead â†’ bypass, send for manual review â”€â”€â”€
             if decision is None:
                 msg = (
-                    f"ðŸš° *Water Cut Alert â€” REVIEW NEEDED*\n"
-                    f"ðŸ“ *Area: F-North / Sion / Matunga / Wadala / CGS*\n"
-                    f"âš ï¸ *AI Bypassed â€” quota exhausted, no explicit NO received*\n"
+                    f"ðŸš° <b>Water Cut Alert â€” REVIEW NEEDED</b>\n"
+                    f"ðŸ“ <b>Area: F-North / Sion / Matunga / Wadala / CGS</b>\n"
+                    f"âš ï¸ <b>AI Bypassed â€” quota exhausted, no explicit NO received</b>\n"
                     f"ðŸ“ Passed Filter 1 (headline) and Filter 2 (body + area). "
                     f"Please verify manually.\n\n"
-                    f"ðŸ“° {title}\n"
-                    f"ðŸ”— [Read Article]({real_url})"
+                    f"ðŸ“° {_escape_html(title)}\n"
+                    f"ðŸ”— <a href=\"{_escape_html(real_url)}\">Read Article</a>"
                 )
                 print("      ðŸš¨ Both AIs exhausted. Sending bypass review alert...")
                 send_telegram_message(msg)
@@ -538,12 +592,12 @@ def check_water_cuts():
                 try:    summary = decision.split("|", 1)[1].strip()
                 except: summary = "Check article for details."
                 msg = (
-                    f"ðŸš° *Water Cut Alert â€” CONFIRMED*\n"
-                    f"ðŸ“ *Area: F-North / Sion / Matunga / Wadala / CGS*\n"
-                    f"ðŸ“ {summary}\n\n"
-                    f"ðŸ“° {title}\n"
-                    f"ðŸ”— [Read Article]({real_url})\n"
-                    f"_Verified by: {ai_used}_"
+                    f"ðŸš° <b>Water Cut Alert â€” CONFIRMED</b>\n"
+                    f"ðŸ“ <b>Area: F-North / Sion / Matunga / Wadala / CGS</b>\n"
+                    f"ðŸ“ {_escape_html(summary)}\n\n"
+                    f"ðŸ“° {_escape_html(title)}\n"
+                    f"ðŸ”— <a href=\"{_escape_html(real_url)}\">Read Article</a>\n"
+                    f"<i>Verified by: {_escape_html(ai_used)}</i>"
                 )
                 print(f"      ðŸš¨ {ai_used} says YES! Sending confirmed alert...")
                 send_telegram_message(msg)
