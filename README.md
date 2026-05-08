@@ -1,6 +1,6 @@
 # F-North Ward Water Cut Alert Bot
 
-An automated Python bot that scans Mumbai water cut news every hour via GitHub Actions
+An automated Python bot that scans Mumbai water cut news twice a day via GitHub Actions
 and sends a Telegram alert ONLY when a confirmed, active water cut affects
 F-North Ward (Sion, Matunga, Wadala, CGS Colony).
 
