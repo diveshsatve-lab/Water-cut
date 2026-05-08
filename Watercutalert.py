@@ -107,15 +107,39 @@ AREA_PATTERNS = [
 ]
 
 BODY_FULL_CUT = [
+    # X-hour water cut / shutdown / suspension / disruption / snapped
     r"\b\d+\s*[-â€“â€”]?\s*hour\s+water\s+(?:cut|shut\s*down|shutdown|suspension|supply\s+cut)\b",
-    r"\b\d+\s*[-â€“â€”]?\s*hour\s+(?:water\s+)?supply\s+(?:cut|shutdown|suspension|disruption)\b",
-    r"\bwater\s+supply\s+(?:will\s+(?:be\s+|remain\s+)?)?(?:suspended|stopped|halted|shut\s*down|disrupted|cut\s+off)\b",
-    r"\bsupply\s+(?:will\s+(?:be\s+)?)?(?:suspended|stopped|halted|shut\s*down|cut\s+off)\b",
+    r"\b\d+\s*[-â€“â€”]?\s*hour\s+(?:water\s+)?supply\s+(?:cut|shutdown|suspension|disrupt(?:ion|ed|s)?|snapped)\b",
+
+    # supply suspended / stopped / halted / shut down / disrupted / hit / affected / snapped / unavailable
+    r"\bwater\s+supply\s+(?:(?:will|is|to)\s+(?:be\s+|remain\s+)?)?(?:suspended|stopped|halted|shut\s*down|disrupt(?:ed|s)?|cut\s+off|hit|affected|snapped|unavailable)\b",
+    r"\bsupply\s+(?:(?:will|is|to)\s+(?:be\s+|remain\s+)?)?(?:suspended|stopped|halted|shut\s*down|cut\s+off|hit|affected|snapped|unavailable)\b",
+
+    # water cut (not followed by %)
     r"\bwater\s+cut\b(?!\s*\d*\s*%)",
-    r"\bno\s+water\s+supply\b",
-    r"\bwater\s+shut(?:\s*down|-?off)\b",
+
+    # no water / zero water
+    r"\b(?:no|zero)\s+water\s+supply\b",
+    r"\bno\s+water\s+(?:for|in|on|tomorrow|today)\b",
+
+    # water shutdown / shutoff / snapped
+    r"\bwater\s+(?:shut(?:\s*down|-?off)|snapped)\b",
+
+    # complete / full / total water cut / stoppage
     r"\b(?:complete|full|total)\s+water\s+(?:cut|shutdown|suspension|stoppage)\b",
+
+    # dry taps / go dry
     r"\bdry\s+taps?\b",
+    r"\b(?:go|goes|going)\s+dry\b",
+
+    # BMC shuts / stops / suspends / halts / snaps water
+    r"\bbmc\s+(?:shuts?|stops?|suspends?|halts?|snaps?)\s+water\b",
+
+    # general water disruption / hit / affected / snapped
+    r"\bwater\s+(?:supply\s+)?(?:disrupt(?:ion|s|ed)|hit|affected|snapped)\b",
+
+    # residents to face water cut / dry taps
+    r"\bface\s+(?:water\s+cut|no\s+water|water\s+shutdown|dry\s+taps)\b",
 ]
 
 
@@ -125,11 +149,30 @@ BODY_FULL_CUT = [
 def get_ist_time():
     return datetime.now(pytz.utc).astimezone(pytz.timezone('Asia/Kolkata'))
 
-def is_published_recently(struct, max_hours=24):
-    if not struct:
-        return False
-    pub_utc   = datetime(*struct[:6], tzinfo=pytz.utc)
-    age_hours = (datetime.now(pytz.utc) - pub_utc).total_seconds() / 3600
+def is_published_recently(entry, max_hours=24):
+    """
+    Returns True only if the article was originally published within max_hours.
+    Uses the OLDER of published_parsed vs updated_parsed to avoid Google News
+    re-crawl tricks where an April article gets a fresh updated timestamp today.
+    If no date is found at all, conservatively returns False (skip the article).
+    """
+    now_utc = datetime.now(pytz.utc)
+
+    candidates = []
+    for field in ('published_parsed', 'updated_parsed'):
+        struct = entry.get(field) if isinstance(entry, dict) else getattr(entry, field, None)
+        if struct:
+            try:
+                candidates.append(datetime(*struct[:6], tzinfo=pytz.utc))
+            except Exception:
+                pass
+
+    if not candidates:
+        return False  # No date at all â€” skip conservatively
+
+    # Use the OLDEST date found â€” catches re-crawled articles
+    oldest = min(candidates)
+    age_hours = (now_utc - oldest).total_seconds() / 3600
     return age_hours <= max_hours
 
 def matches_any(patterns, text):
@@ -186,29 +229,34 @@ def get_article_text(url):
         return ""
 
 def build_prompt(headline, article_text):
-    current_dt = get_ist_time()
+    current_dt  = get_ist_time()
     current_str = current_dt.strftime("%Y-%m-%d %H:%M")
-    return f"""Current Date & Time (IST): {current_str}
+    return f"""You are a strict data extraction bot. Follow these two tasks exactly.
+
+Current Date & Time (IST): {current_str}
 HEADLINE: "{headline}"
 ARTICLE TEXT: "{article_text}"
-TASK: Analyze if this water cut is still active or upcoming for F-North Ward (Sion, Matunga, Wadala, CGS).
 
-CRITICAL LOGIC GATES:
-1. LOCATION: Does it mention "F North", "F-North", "F Ward", "Sion", "Matunga", "Wadala", or "CGS"? If NO -> Reply NO.
-2. STATUS CHECK: Look for words like "Restored", "Resumed", "Back to normal", or "Expected to resume by".
-   - Find the date/time supply returns.
-   - If that restoration time is BEFORE {current_str} IST -> Reply NO (News is expired).
-3. ONGOING/FUTURE: Reply YES ONLY if:
-   - The cut starts in the FUTURE.
-   - OR the cut is ONGOING and the restoration time is in the FUTURE.
+TASK 1 â€” LOCATION CHECK:
+Does the text EXPLICITLY name any of these as an AFFECTED area?
+  F-North Ward, F-North, F Ward, Sion, Matunga, Wadala, CGS Colony
+Rules:
+- Only count it if the location is listed as an affected area.
+- Do NOT count it if the location appears only as a road name, pump station, or background context.
+- Do NOT count "south Mumbai" or "central Mumbai" unless F-North/Sion/Matunga/Wadala/CGS is also named.
+If TASK 1 is NO -> output NOT_CONFIRMED on a single line and stop.
 
-REAL-WORLD TEST CASE:
-Article says: "Restored by 4 PM on May 6".
-Current Time: "10 PM on May 6".
-Result: 4 PM is in the PAST -> Reply NO.
+TASK 2 â€” DATE EXTRACTION (only if TASK 1 is YES):
+Find when the water cut ENDS (or STARTS if end time is not mentioned).
+Translate that time to this exact format: YYYY-MM-DD HH:MM (IST)
+Rules:
+- If article says "tomorrow at 4 PM" and today is {current_str[:10]}, output the next day at 16:00.
+- If no time is found at all, output UNKNOWN.
+- Do NOT decide if the time is past or future. Just translate it.
 
-OUTPUT FORMAT (one line only): YES | [area] | Ends: [end datetime] | [Status: Upcoming/Ongoing] or NO"""
-
+OUTPUT FORMAT (exactly one line, no extra text):
+CONFIRMED | [exact location name] | [YYYY-MM-DD HH:MM or UNKNOWN]
+NOT_CONFIRMED | [one sentence reason]"""
 def _parse_gemini_wait(err_str):
     m = re.search(r"retryDelay[\"'\s:]+(\d+)s", err_str)
     return (int(m.group(1)) + 3) if m else 65
@@ -379,7 +427,7 @@ def ask_groq(headline, article_text):
 
             r.raise_for_status()
             other_errors = 0
-            result = r.json()["choices"][0]["message"]["content"].strip()
+            result = r.json()["choices"][0]["message"]["content"].strip().replace("**", "")
             print(f"      ðŸ’¬ Groq: {result[:100]}")
             return result
 
@@ -408,9 +456,20 @@ def _escape_html(text):
             .replace("<", "&lt;")
             .replace(">", "&gt;"))
 
+def clean_plain_text(text):
+    """Normalize Unicode punctuation to simple plain-text ASCII for Telegram."""
+    return (str(text)
+            .replace("â€”", "-")
+            .replace("â€“", "-")
+            .replace("â€™", "'")
+            .replace("â€˜", "'")
+            .replace('"', '"')
+            .replace('"', '"')
+            .strip())
+
 def send_telegram_message(message):
     """
-    Sends via HTML parse_mode â€” far more robust than Markdown.
+    Sends plain text â€” immune to all special characters in news headlines.
     Markdown breaks on any unescaped _ * [ ] in news headlines.
     HTML only breaks on unescaped & < > which we escape above.
     """
@@ -420,7 +479,7 @@ def send_telegram_message(message):
     try:
         r = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-            json={"chat_id": CHAT_ID, "text": message, "parse_mode": "HTML"},
+            json={"chat_id": CHAT_ID, "text": message},
             timeout=10)
         if r.status_code != 200:
             print(f"      âš ï¸ Telegram error {r.status_code}: {r.text[:100]}")
@@ -466,7 +525,7 @@ def check_water_cuts():
                 continue
             seen_titles.add(norm)
 
-            if not is_published_recently(entry.get('published_parsed')):
+            if not is_published_recently(entry):
                 continue
             if 'water' not in title.lower():
                 continue
@@ -550,13 +609,12 @@ def check_water_cuts():
             # â”€â”€ Step 3: Both dead â†’ bypass, send for manual review â”€â”€â”€
             if decision is None:
                 msg = (
-                    f"ðŸš° <b>Water Cut Alert â€” REVIEW NEEDED</b>\n"
-                    f"ðŸ“ <b>Area: F-North / Sion / Matunga / Wadala / CGS</b>\n"
-                    f"âš ï¸ <b>AI Bypassed â€” quota exhausted, no explicit NO received</b>\n"
-                    f"ðŸ“ Passed Filter 1 (headline) and Filter 2 (body + area). "
-                    f"Please verify manually.\n\n"
-                    f"ðŸ“° {_escape_html(title)}\n"
-                    f"ðŸ”— <a href=\"{_escape_html(real_url)}\">Read Article</a>"
+                    f"[WATER CUT ALERT - REVIEW NEEDED]\n"
+                    f"Area: F-North / Sion / Matunga / Wadala / CGS\n\n"
+                    f"AI quota exhausted - please verify manually.\n"
+                    f"Passed headline and area keyword filters.\n\n"
+                    f"Headline: {clean_plain_text(title)}\n"
+                    f"Link: {real_url}"
                 )
                 print("      ðŸš¨ Both AIs exhausted. Sending bypass review alert...")
                 send_telegram_message(msg)
@@ -564,23 +622,46 @@ def check_water_cuts():
                 print()
                 continue
 
-            # â”€â”€ Explicit AI verdict â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-            if decision.upper().startswith("YES"):
-                try:    summary = decision.split("|", 1)[1].strip()
-                except: summary = "Check article for details."
+            # â”€â”€ Explicit AI verdict + Python expiry kill-switch â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            # AI outputs: CONFIRMED | location | YYYY-MM-DD HH:MM (or UNKNOWN)
+            #          or NOT_CONFIRMED | reason
+            if decision.upper().startswith("CONFIRMED"):
+                parts    = decision.split("|")
+                location = parts[1].strip() if len(parts) > 1 else "F-North area"
+                ai_time  = parts[2].strip() if len(parts) > 2 else "UNKNOWN"
+
+                # â”€â”€ Python expiry kill-switch â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                # AI translates the date â€” Python decides if it is past or future.
+                # This prevents hallucinated "Ongoing" for already-ended cuts.
+                time_valid = True
+                if ai_time and ai_time.upper() != "UNKNOWN":
+                    try:
+                        ist_tz     = pytz.timezone("Asia/Kolkata")
+                        parsed_end = ist_tz.localize(datetime.strptime(ai_time, "%Y-%m-%d %H:%M"))
+                        if parsed_end < get_ist_time():
+                            print(f"      â© Python kill-switch: cut ended {ai_time} IST (past). Skipped.")
+                            time_valid = False
+                    except ValueError:
+                        print(f"      âš ï¸ Could not parse AI time '{ai_time}'. Proceeding to avoid missing alert.")
+
+                if not time_valid:
+                    print()
+                    continue
+
                 msg = (
-                    f"ðŸš° <b>Water Cut Alert â€” CONFIRMED</b>\n"
-                    f"ðŸ“ <b>Area: F-North / Sion / Matunga / Wadala / CGS</b>\n"
-                    f"ðŸ“ {_escape_html(summary)}\n\n"
-                    f"ðŸ“° {_escape_html(title)}\n"
-                    f"ðŸ”— <a href=\"{_escape_html(real_url)}\">Read Article</a>\n"
-                    f"<i>Verified by: {_escape_html(ai_used)}</i>"
+                    f"[WATER CUT ALERT - CONFIRMED]\n"
+                    f"Area: F-North / Sion / Matunga / Wadala / CGS\n\n"
+                    f"Location: {clean_plain_text(location)}\n"
+                    f"Cut ends: {clean_plain_text(ai_time)}\n\n"
+                    f"Headline: {clean_plain_text(title)}\n"
+                    f"Link: {real_url}\n"
+                    f"Verified by: {clean_plain_text(ai_used)} + Python"
                 )
-                print(f"      ðŸš¨ {ai_used} says YES! Sending confirmed alert...")
+                print(f"      ðŸš¨ {ai_used} confirmed + Python approved! Sending alert...")
                 send_telegram_message(msg)
                 alerts_sent += 1
             else:
-                print(f"      âœ… {ai_used} â†’ NO (not affecting F-North). Skipped.")
+                print(f"      âœ… {ai_used} -> NOT_CONFIRMED (not affecting F-North). Skipped.")
 
             print()
 
