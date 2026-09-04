@@ -1,4 +1,4 @@
-Keep: Keep Alive
+name: Keep Alive
 
 on:
   schedule:
@@ -18,3 +18,4 @@ jobs:
         with:
           branch: main
           commit_message: "Keepalive ping"
+
