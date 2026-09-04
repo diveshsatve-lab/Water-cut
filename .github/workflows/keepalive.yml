@@ -1,4 +1,4 @@
-name: Keep Alive
+Keep: Keep Alive
 
 on:
   schedule:
@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  contents: write       # allow GITHUB_TOKEN to push commits
   actions: write
 
 jobs:
@@ -14,3 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: gautamkrishnar/keepalive-workflow@v2
+        with:
+          branch: main
+          commit_message: "Keepalive ping"
