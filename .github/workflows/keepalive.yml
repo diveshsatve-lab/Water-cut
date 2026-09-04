@@ -2,11 +2,11 @@ name: Keep Alive
 
 on:
   schedule:
-    - cron: '0 0 1,15 * *'  # Runs on 1st and 15th of every month
+    - cron: '0 0 1,15 * *'
   workflow_dispatch:
 
 permissions:
-  contents: write       # allow GITHUB_TOKEN to push commits
+  contents: write
   actions: write
 
 jobs:
@@ -14,8 +14,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: gautamkrishnar/keepalive-workflow@v2
-        with:
-          branch: main
-          commit_message: "Keepalive ping"
-
+      - name: Create keepalive commit
+        run: |
+          date > keepalive.txt
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add keepalive.txt
+          git commit -m "Keepalive ping" || echo "No changes to commit"
+          git push
